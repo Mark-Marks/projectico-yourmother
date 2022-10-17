@@ -9,35 +9,30 @@ local config = {};
 --- @within config
 --- @readonly
 --- Refers to whether or not the object has been created by config.New()
-config.isInitializedConfig = false;
+config._isInitializedConfig = false;
+config._added_isInitializedConfig = true;
+config._inTable_isInitializedConfig = true;
 
 config.__index = config;
 
---- @prop _addedNew boolean
---- @within config
---- @ignore
---- Makes config:Initialize() ignore config.New()
+-- ignore all the config._added<> and config._inTable<>
 config._addedNew = true;
---- @prop _addedAddProp boolean
---- @within config
---- @ignore
---- Makes config:Initialize() ignore config:AddProp()
 config._addedAddProp = true;
---- @prop _addedModifyProp boolean
---- @within config
---- @ignore
---- Makes config:Initialize() ignore config:ModifyProp()
 config._addedModifyProp = true;
---- @prop _addedInitialize boolean
---- @within config
---- @ignore
---- Makes config:Initialie() ignore config:Initialize()
 config._addedInitialize = true;
+config._addedReadProp = true;
+config._inTableNew = true;
+config._inTableAddProp = true;
+config._inTableModifyProp = true;
+config._inTableInitialize = true;
+config._inTableReadProp = true;
 --- @prop _connection boolean
 --- @within config
 --- @ignore
 --- Heartbeat connection generated during config:Initialize()
 config._connection = nil;
+config._added_connection = true;
+config._inTable_connection = true;
 
 --[=[
     Creates a new configuration, or loads a pre-existing one.
@@ -53,21 +48,21 @@ function config.New(name)
     end
     local newConfig = {};
     setmetatable(newConfig,config);
-    --- @prop isInitializedconfig boolean
+    --- @prop _isInitializedconfig boolean
     --- @within newConfig
     --- @ignore
     --- Refers to whether or not the object has been created with config.New()
-    newConfig.isInitializedConfig = true;
-    --- @prop path string
+    newConfig._isInitializedConfig = true;
+    --- @prop _path string
     --- @within newConfig
     --- @ignore
     --- Refers to the name of the file containing the config, essentially being a "path".
-    newConfig.path = name;
-    --- @prop contents string
+    newConfig._path = name;
+    --- @prop _contents json i guess
     --- @within newConfig
     --- @ignore
     --- Refers to current contents of the config. Make sure that the only way you're modifying them is with config:ModifyProp().
-    newConfig.contents = readfile(name);
+    newConfig._contents = HS:JSONDecode(readfile(name));
 
     newConfig._added = true;
 
@@ -86,7 +81,7 @@ end
     @return string -- A return will only happen during an error.
 ]=]
 function config:AddProp(name)
-    if (not self.isInitializedConfig) then
+    if (not self._isInitializedConfig) then
         return "Ensure that you're currently using a config returned by config.New()";
     end
     for index,_ in pairs(self) do
@@ -112,7 +107,7 @@ end
     @return string -- A return will only happen during an error.
 ]=]
 function config:ModifyProp(name, value)
-    if (not self.isInitializedConfig) then
+    if (not self._isInitializedConfig) then
         return "Ensure that you're currently using a config returned by config.New()";
     end
     local doesExist = false;
@@ -132,7 +127,33 @@ function config:ModifyProp(name, value)
 end
 
 --[=[
-    Initializes the config, eg. starts modifying the file on every property change.
+    Reads the value of a given property.
+
+    @since v1.1.0
+    @method ReadProp
+    @within config
+    @param name -- The name of the property.
+    @return any -- A return will happen with either a error message or the value of the property.
+]=]
+function config:ReadProp(name)
+    if (not self._isInitializedConfig) then
+        return "Ensure that you're currently using a config returned by config.New()";
+    end
+    local doesExist = false;
+    for index,_ in pairs(self) do
+        if (index == name) then
+            doesExist = true;
+        end
+    end
+    if (not doesExist) then
+        return "The given property does not exist.";
+    end
+
+    return self[name];
+end
+
+--[=[
+    Initializes the config, eg. starts modifying the file on every property change & reads the contents of the file.
 
     @since v1.0.0
     @method Initialize
@@ -140,14 +161,27 @@ end
     @return string -- A return will only happen during an error.
 ]=]
 function config:Initialize()
-    if (not self.isInitializedConfig) then
+    if (not self._isInitializedConfig) then
         return "Ensure that you're currently using a config returned by config.New()";
+    end
+
+    local fresh = true;
+    if (HS:JSONDecode(readfile(self.path)) ~= "BEGINNING OF CONFIG") then fresh = false end;
+
+    if (fresh == false) then
+        for index,value in pairs(HS:JSONDecode(readfile(self.path))) do
+            if (not self["_inTable"..index]) then
+                self[index] = value;
+                self["_inTable"..index] = true;
+            end
+        end
     end
 
     local function heartbeat()
         local defaultBegin = false;
         if (HS:JSONDecode(readfile(self.path)) == "BEGINNING OF CONFIG") then defaultBegin = true end;
-        local currentContents = HS:JSONDecode(readfile(self.path));
+        --local currentContents = HS:JSONDecode(readfile(self.path));
+        self._contents = HS:JSONDecode(readfile(self.path));
 
         for index,value in pairs(self) do
             if (self["_added"..index] == false) then
@@ -157,9 +191,9 @@ function config:Initialize()
                     end
                 end
                 if (not defaultBegin) then
-                    currentContents = HS:JSONDecode(readfile(self.path));
-                    currentContents[index] = value;
-                    writefile(HS:JSONEncode(currentContents));
+                    self._contents = HS:JSONDecode(readfile(self.path));
+                    self._contents[index] = value;
+                    writefile(HS:JSONEncode(self._contents));
                 end
                 self["_added"..index] = true;
             end
