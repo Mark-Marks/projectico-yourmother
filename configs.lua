@@ -1,4 +1,4 @@
-local HS = game:Getservice("HttpService");
+local HS = game:GetService("HttpService");
 
 --- @class config
 --- @since v1.0.0
