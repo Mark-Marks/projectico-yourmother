@@ -80,7 +80,7 @@ end
     @param name -- The name of the property.
     @return string -- A return will only happen during an error.
 ]=]
-function config:AddProp(name)
+function config:AddProp(name,value)
     if (not self._isInitializedConfig) then
         return "Ensure that you're currently using a config returned by config.New()";
     end
@@ -90,7 +90,7 @@ function config:AddProp(name)
         end
     end
 
-    self[name] = nil;
+    self[name] = value;
     self["_added"..name] = false;
 
     return;
